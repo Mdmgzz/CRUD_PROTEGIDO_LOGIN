@@ -1,9 +1,6 @@
 <?php
-
 const CSV_FILE = __DIR__ . '/usuarios.csv';
 
-
-// Lee el archivo CSV y devuelve un array con todos los usuarios
 function read_users(): array {
     if (!file_exists(CSV_FILE)) return [];
     $out = [];
@@ -11,14 +8,15 @@ function read_users(): array {
     if (!$f) return [];
     if (flock($f, LOCK_SH)) {
         while (($row = fgetcsv($f)) !== false) {
-            // esperamos columnas: id,nombre,email,rol
-            if (count($row) < 5) continue;
+            // ahora esperamos columnas: id,nombre,email,rol,fecha_alta,password_hash
+            if (count($row) < 5) continue; // al menos hasta fecha_alta
             $out[] = [
-                'id' => $row[0],
-                'nombre' => $row[1],
-                'email' => $row[2],
-                'rol' => $row[3],
-                'fecha_alta' => $row[4],
+                'id' => $row[0] ?? '',
+                'nombre' => $row[1] ?? '',
+                'email' => $row[2] ?? '',
+                'rol' => $row[3] ?? '',
+                'fecha_alta' => $row[4] ?? '',
+                'password_hash' => $row[5] ?? '',
             ];
         }
         flock($f, LOCK_UN);
@@ -27,13 +25,20 @@ function read_users(): array {
     return $out;
 }
 
-// Escribe el array de usuarios en el archivo CSV para añadir el  nuevo usuario
 function write_users(array $users): bool {
     $tmp = tempnam(sys_get_temp_dir(), 'u');
     $h = fopen($tmp, 'w');
     if (!$h) return false;
     foreach ($users as $u) {
-        fputcsv($h, [$u['id'], $u['nombre'], $u['email'], $u['rol'], $u['fecha_alta']]);
+        // asegúrate de mantener el orden correcto
+        fputcsv($h, [
+            $u['id'],
+            $u['nombre'],
+            $u['email'],
+            $u['rol'],
+            $u['fecha_alta'],
+            $u['password_hash'] ?? '',
+        ]);
     }
     fclose($h);
 
@@ -50,7 +55,6 @@ function write_users(array $users): bool {
     return true;
 }
 
-// Devuelve el siguiente ID disponible para asignarselo al nuevo usuario
 function next_id(): int {
     $max = 0;
     foreach (read_users() as $u) {
@@ -60,7 +64,6 @@ function next_id(): int {
     return $max + 1;
 }
 
-// Devuelve el usuario con el ID dado, o null si no existe
 function find_user($id) {
     foreach (read_users() as $u) {
         if ((int)$u['id'] === (int)$id) return $u;
@@ -68,23 +71,36 @@ function find_user($id) {
     return null;
 }
 
+function find_user_by_email(string $email) {
+    foreach (read_users() as $u) {
+        if (strcasecmp($u['email'], $email) === 0) return $u;
+    }
+    return null;
+}
+
+/**
+ * Verifica credenciales: devuelve el usuario si ok, false si falla
+ */
+function verify_credentials(string $email, string $password) {
+    $u = find_user_by_email($email);
+    if (!$u) return false;
+    if (empty($u['password_hash'])) return false;
+    if (password_verify($password, $u['password_hash'])) return $u;
+    return false;
+}
 
 function h($s) { return htmlspecialchars((string)$s, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); }
 
-// Valida los datos de entrada del usuario
 function validate_user_input(array $data): array {
     $errors = [];
     $name = trim($data['nombre'] ?? '');
     $email = trim($data['email'] ?? '');
     $role = trim($data['rol'] ?? '');
 
-    // si hay errores, los añadimos al array $errors
-    // si no, devolvemos un array vacío
     if ($name === '') $errors['nombre'] = 'Nombre obligatorio';
     if ($email === '') $errors['email'] = 'Email obligatorio';
     elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) $errors['email'] = 'Email no válido';
     if ($role === '') $errors['rol'] = 'Rol obligatorio';
 
-
-    return $errors; 
+    return $errors;
 }

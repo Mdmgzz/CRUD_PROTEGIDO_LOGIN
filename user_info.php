@@ -1,5 +1,7 @@
 <?php
+require 'auth_check.php';
 require 'functions.php';
+require 'csrf.php';
 
 // obtener el ID del usuario desde la URL y buscar sus datos
 $id = $_GET['id'] ?? null;
@@ -18,8 +20,19 @@ if (!$user) { echo "Usuario no encontrado"; exit; }
     <header class="header">
       <div class="brand"><span class="logo">U</span><div>Usuario</div></div>
       <div class="actions">
+        <span class="small">Hola <?= h($_SESSION['username'] ?? '') ?></span>
         <a href="user_edit.php?id=<?= urlencode($user['id']) ?>">Editar</a>
+
+        <?php if (($_SESSION['role'] ?? '') === 'administrador'): ?>
+          <form method="post" action="user_delete.php" style="display:inline" onsubmit="return confirm('Confirmar eliminación')">
+            <input type="hidden" name="id" value="<?= h($user['id']) ?>">
+            <input type="hidden" name="csrf" value="<?= h(csrf_token()) ?>">
+            <button type="submit" style="background:none;border:none;padding:0;color:var(--danger);cursor:pointer;font-size:13px">Eliminar</button>
+          </form>
+        <?php endif; ?>
+
         <a href="user_index.php">Volver</a>
+        <a href="logout.php">Salir</a>
       </div>
     </header>
 

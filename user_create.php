@@ -1,17 +1,30 @@
 <?php
+require 'auth_check.php';
 require 'functions.php';
+require 'csrf.php';
 
 $errors = [];
 $values = ['nombre'=>'','email'=>'','rol'=>''];
 
 // si el formulario se ha enviado por POST entonces procesamos los datos
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!csrf_validate($_POST['csrf'] ?? '')) { http_response_code(403); echo "Token inválido"; exit; }
+
     $values['nombre'] = $_POST['nombre'] ?? '';
     $values['email']  = $_POST['email'] ?? '';
     $values['rol']    = $_POST['rol'] ?? '';
+    $password = $_POST['password'] ?? '';
 
     // validamos los datos de entrada
     $errors = validate_user_input($values);
+
+    // contraseña obligatoria al crear
+    if ($password === '') $errors['password'] = 'Contraseña obligatoria';
+
+    // comprobar email duplicado
+    $existing = find_user_by_email(trim($values['email']));
+    if ($existing) $errors['email'] = 'Email ya registrado';
+
     // si no hay errores, añadimos el nuevo usuario
     if (empty($errors)) {
         $users = read_users();
@@ -20,7 +33,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'nombre' => $values['nombre'],
             'email' => $values['email'],
             'rol' => $values['rol'],
-            'fecha_alta' => date('Y-m-d')
+            'fecha_alta' => date('Y-m-d'),
+            'password_hash' => password_hash($password, PASSWORD_DEFAULT),
         ];
         write_users($users);
         header('Location: user_index.php');
@@ -39,10 +53,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   <div class="container">
     <header class="header">
       <div class="brand"><span class="logo">U</span><div>Nuevo usuario</div></div>
-      <div class="actions"><a href="user_index.php">Volver</a></div>
+      <div class="actions">
+        <span class="small">Hola <?= h($_SESSION['username'] ?? '') ?></span>
+        <a href="logout.php">Salir</a>
+        <a href="user_index.php">Volver</a>
+      </div>
     </header>
 
     <form method="post" class="card" novalidate>
+      <input type="hidden" name="csrf" value="<?= h(csrf_token()) ?>">
       <div class="form-row">
         <div>
           <label>Nombre</label>
@@ -65,6 +84,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <option value="visitante" <?= $values['rol']=='visitante'?'selected':'' ?>>Visitante</option>
           </select>
           <div class="small" style="color:#c42"><?= $errors['rol'] ?? '' ?></div>
+        </div>
+
+        <div class="full">
+          <label>Contraseña</label>
+          <input name="password" type="password" value="">
+          <div class="small" style="color:#c42"><?= $errors['password'] ?? '' ?></div>
         </div>
       </div>
 

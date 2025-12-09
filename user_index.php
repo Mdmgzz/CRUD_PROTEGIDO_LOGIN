@@ -1,5 +1,8 @@
 <?php
+require 'auth_check.php';
 require 'functions.php';
+require 'csrf.php';
+
 // ejecutar la función para leer los usuarios desde el archivo CSV
 $users = read_users();
 ?>
@@ -15,7 +18,9 @@ $users = read_users();
     <header class="header">
       <div class="brand"><span class="logo">U</span><div>Gestión de usuarios</div></div>
       <div class="actions">
+        <span class="small">Hola <?= h($_SESSION['username'] ?? '') ?> (<?= h($_SESSION['role'] ?? '') ?>)</span>
         <a href="user_create.php" class="primary">Crear usuario</a>
+        <a href="logout.php">Salir</a>
       </div>
     </header>
 
@@ -39,8 +44,15 @@ $users = read_users();
               <td class="row-actions">
                 <a href="user_info.php?id=<?= urlencode($u['id']) ?>">Ver</a>
                 <a href="user_edit.php?id=<?= urlencode($u['id']) ?>">Editar</a>
-                <a href="user_delete.php?id=<?= urlencode($u['id']) ?>" onclick="return confirm('Confirmar eliminación')"
-                   style="color:var(--danger)">Eliminar</a>
+
+                <?php if (($_SESSION['role'] ?? '') === 'administrador'): ?>
+                  <form method="post" action="user_delete.php" style="display:inline" onsubmit="return confirm('Confirmar eliminación')">
+                    <input type="hidden" name="id" value="<?= h($u['id']) ?>">
+                    <input type="hidden" name="csrf" value="<?= h(csrf_token()) ?>">
+                    <button type="submit" style="background:none;border:none;padding:0;color:var(--danger);cursor:pointer;font-size:13px">Eliminar</button>
+                  </form>
+                <?php endif; ?>
+
               </td>
             </tr>
           <?php endforeach; endif; ?>
@@ -48,6 +60,7 @@ $users = read_users();
       </table>
     </div>
 
-</div>
+  <div class="footer">Listado usuarios</div>
+  </div>
 </body>
 </html>
